@@ -1,0 +1,10 @@
+{
+  "session-intercom": {
+    "command": "uvx",
+    "args": [
+      "--from",
+      "git+https://github.com/struktured-labs/session-intercom@main",
+      "session-intercom"
+    ]
+  }
+}

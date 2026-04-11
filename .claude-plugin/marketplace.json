@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "struktured-labs",
+  "description": "Struktured Labs plugins for Claude Code — batteries-included MCP tools for multi-session workflows, automation, and developer productivity",
+  "owner": {
+    "name": "Struktured Labs"
+  },
+  "plugins": [
+    {
+      "name": "session-intercom",
+      "description": "P2P messaging between independent Claude Code sessions. Zero-polling native inbox delivery, one-command setup.",
+      "category": "productivity",
+      "source": "./plugins/session-intercom",
+      "homepage": "https://github.com/struktured-labs/session-intercom"
+    }
+  ]
+}
