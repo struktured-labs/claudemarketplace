@@ -1,6 +1,6 @@
 {
   "name": "session-intercom",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "P2P messaging between independent Claude Code sessions with zero-polling native inbox delivery. Ships the intercom MCP server plus a one-command setup slash command.",
   "author": {
     "name": "Struktured Labs"

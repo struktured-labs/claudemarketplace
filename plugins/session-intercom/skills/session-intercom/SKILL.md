@@ -1,7 +1,7 @@
 ---
 name: session-intercom
 description: Use this skill when the user wants to coordinate between multiple Claude Code sessions, send messages between agents, set up P2P agent communication, mentions "intercom", "agent messaging", "session messaging", "talk to another agent/session", "broadcast to agents", or asks how to make two sessions cooperate. This skill explains how to use the session-intercom MCP to enable zero-polling P2P messaging.
-version: 0.3.1
+version: 0.3.2
 ---
 
 # session-intercom
@@ -50,13 +50,19 @@ Once registered, use these MCP tools (all namespaced `mcp__session-intercom__*`)
 
 ## Recovering from broken native delivery
 
-If `intercom_diagnose` returns `delivery_likely_broken`, a plain restart will NOT fix it on its own — the new conversation gets a new internal session ID, the team config still has the old `leadSessionId`, and `TeamCreate` errors when called on an existing team (it won't update the binding). Reliable recovery:
+If `intercom_diagnose` returns `delivery_likely_broken`, recovery does **not** require restarting Claude. `TeamDelete` clears the in-process binding, and a subsequent `TeamCreate` in the same session establishes a fresh one. Verified recipe:
 
-1. **In the broken session**, call `TeamDelete()` (no args — it operates on the current session's team). This wipes `~/.claude/teams/<name>/` and `~/.claude/tasks/<name>/` and clears the stale team context from the session.
-2. **Restart the Claude session** (the user has to do this — it's a fresh conversation).
-3. **In the new session**, run `/session-intercom:intercom <same-name>`. `TeamCreate` writes a fresh config with the new session's ID, the binding takes correctly at startup, and `intercom_register` reclaims the existing intercom DB row idempotently — no message history is lost.
+1. **`TeamDelete()`** in the broken session (no args — operates on the current session's team). Wipes `~/.claude/teams/<name>/` and `~/.claude/tasks/<name>/` and clears the stale team context from the in-process binding.
+2. **`TeamCreate(team_name=<name>)`** — fresh config with the current session's ID as lead.
+3. **`intercom_register(name=<name>, team_name=<name>)`** — idempotent reclaim of the existing intercom DB row, no message history lost.
+4. (optional) **`/mcp`** to reconnect MCP servers if the MCP code itself was updated and the running server has stale code.
 
-Why disk-deletion via `TeamDelete` rather than `rm -rf`: it also clears the in-process team context, which `rm -rf` can't touch.
+This is the same thing the `/session-intercom:intercom` slash command does, except `TeamCreate` will refuse to run on an existing team unless you `TeamDelete` first. So:
+
+- **Fresh session, no team yet**: just run `/session-intercom:intercom <name>` — done.
+- **Broken binding on existing team**: `TeamDelete()` first, then `/session-intercom:intercom <name>`.
+
+Why use `TeamDelete` rather than `rm -rf` on the team directory: `TeamDelete` also clears the in-process team context binding, which a disk-only delete can't touch.
 
 ## Registration is idempotent and durable
 
