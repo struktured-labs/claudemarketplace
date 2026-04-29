@@ -1,7 +1,7 @@
 ---
 name: session-intercom
 description: Use this skill when the user wants to coordinate between multiple Claude Code sessions, send messages between agents, set up P2P agent communication, mentions "intercom", "agent messaging", "session messaging", "talk to another agent/session", "broadcast to agents", or asks how to make two sessions cooperate. This skill explains how to use the session-intercom MCP to enable zero-polling P2P messaging.
-version: 0.3.0
+version: 0.3.1
 ---
 
 # session-intercom
@@ -46,7 +46,17 @@ Once registered, use these MCP tools (all namespaced `mcp__session-intercom__*`)
 
 **You do not need to call `intercom_poll`.** Once registered with a `team_name`, messages from other sessions are delivered automatically between turns via the CLI's built-in `InboxPoller`, exactly like agent-team messages. They'll just appear in your next turn as `[intercom DM from xyz]` notifications. Treat them like any other user/teammate input.
 
-**Caveat for long-lived sessions**: the CLI's poller binds at conversation startup. If the team config was created late, or your conversation has been running across many compactions and the leadSessionId no longer matches, native delivery can silently fail even though `intercom_register` says it's set up. If the user complains messages aren't arriving, run `intercom_diagnose(<name>)` first — it'll tell you whether the file inbox has unread messages stuck behind a stale binding. The only durable fix is a session restart.
+**Caveat for long-lived sessions**: the CLI's poller binds at conversation startup. If the team config was created late, or your conversation has been running across many compactions and the leadSessionId no longer matches, native delivery can silently fail even though `intercom_register` says it's set up. If the user complains messages aren't arriving, run `intercom_diagnose(<name>)` first — it'll tell you whether the file inbox has unread messages stuck behind a stale binding.
+
+## Recovering from broken native delivery
+
+If `intercom_diagnose` returns `delivery_likely_broken`, a plain restart will NOT fix it on its own — the new conversation gets a new internal session ID, the team config still has the old `leadSessionId`, and `TeamCreate` errors when called on an existing team (it won't update the binding). Reliable recovery:
+
+1. **In the broken session**, call `TeamDelete()` (no args — it operates on the current session's team). This wipes `~/.claude/teams/<name>/` and `~/.claude/tasks/<name>/` and clears the stale team context from the session.
+2. **Restart the Claude session** (the user has to do this — it's a fresh conversation).
+3. **In the new session**, run `/session-intercom:intercom <same-name>`. `TeamCreate` writes a fresh config with the new session's ID, the binding takes correctly at startup, and `intercom_register` reclaims the existing intercom DB row idempotently — no message history is lost.
+
+Why disk-deletion via `TeamDelete` rather than `rm -rf`: it also clears the in-process team context, which `rm -rf` can't touch.
 
 ## Registration is idempotent and durable
 
