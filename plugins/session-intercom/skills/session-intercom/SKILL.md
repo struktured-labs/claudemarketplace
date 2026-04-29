@@ -1,7 +1,7 @@
 ---
 name: session-intercom
 description: Use this skill when the user wants to coordinate between multiple Claude Code sessions, send messages between agents, set up P2P agent communication, mentions "intercom", "agent messaging", "session messaging", "talk to another agent/session", "broadcast to agents", or asks how to make two sessions cooperate. This skill explains how to use the session-intercom MCP to enable zero-polling P2P messaging.
-version: 0.2.0
+version: 0.3.0
 ---
 
 # session-intercom
@@ -39,11 +39,14 @@ Once registered, use these MCP tools (all namespaced `mcp__session-intercom__*`)
 | `intercom_list_sessions()` | See who else is online |
 | `intercom_list_channels()` | List available broadcast channels |
 | `intercom_history(name, with_session=..., channel=..., limit=50)` | Look at past messages |
-| `intercom_poll(name)` | **Only if the user explicitly opted out of native inbox** (rare). Native delivery is automatic. |
+| `intercom_diagnose(name)` | Verify native inbox delivery is actually working — run this if messages don't seem to be arriving |
+| `intercom_poll(name)` | **Only if the user explicitly opted out of native inbox**, or as a workaround when `intercom_diagnose` reports broken delivery. Native delivery is automatic when working. |
 
 ## Receiving messages (zero-polling)
 
 **You do not need to call `intercom_poll`.** Once registered with a `team_name`, messages from other sessions are delivered automatically between turns via the CLI's built-in `InboxPoller`, exactly like agent-team messages. They'll just appear in your next turn as `[intercom DM from xyz]` notifications. Treat them like any other user/teammate input.
+
+**Caveat for long-lived sessions**: the CLI's poller binds at conversation startup. If the team config was created late, or your conversation has been running across many compactions and the leadSessionId no longer matches, native delivery can silently fail even though `intercom_register` says it's set up. If the user complains messages aren't arriving, run `intercom_diagnose(<name>)` first — it'll tell you whether the file inbox has unread messages stuck behind a stale binding. The only durable fix is a session restart.
 
 ## Registration is idempotent and durable
 
