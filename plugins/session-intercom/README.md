@@ -23,16 +23,16 @@ If you omit the name, the command will pick one based on your cwd.
 
 ## Use
 
-Send a direct message:
+Your own name is implicit after `/intercom`. Send a direct message:
 
 ```
-intercom_send("your-name", "recipient-name", "hello from over here")
+intercom_send(to_name="recipient-name", body="hello from over here")
 ```
 
 Broadcast to a channel:
 
 ```
-intercom_broadcast("your-name", "deploy is green", "general")
+intercom_broadcast(body="deploy is green")
 ```
 
 See who's online:

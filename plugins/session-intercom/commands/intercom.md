@@ -1,7 +1,7 @@
 ---
 description: Set up session-intercom for this session (TeamCreate + intercom_register in one step)
 argument-hint: <session-name>
-allowed-tools: [TeamCreate, mcp__session-intercom__intercom_register, mcp__session-intercom__intercom_list_sessions]
+allowed-tools: [TeamCreate, TeamDelete, mcp__plugin_session-intercom_session-intercom__intercom_register, mcp__plugin_session-intercom_session-intercom__intercom_list_sessions]
 ---
 
 # /intercom — one-command setup
@@ -16,23 +16,23 @@ If no name was provided, pick a sensible one based on the current working direct
    ```
    TeamCreate(team_name=<name>)
    ```
-   If TeamCreate reports that the team already exists, that's fine — continue.
+   If TeamCreate errors with "Already leading team", run `TeamDelete()` first (it operates on the current team), then retry `TeamCreate`. This is required to refresh a stale poller binding.
 
-2. **Register with intercom**, passing the same name as `team_name` to enable native inbox delivery:
+2. **Register with intercom** to enable native delivery and set this as the session's identity:
    ```
-   mcp__session-intercom__intercom_register(name=<name>, team_name=<name>)
+   intercom_register(name=<name>, team_name=<name>)
    ```
-   Registration is idempotent — safe to call even if the session was already registered.
+   After this, all other intercom tools default to `<name>` — no need to pass `from_name` on every call. Registration is idempotent.
 
 3. **List other sessions** so the user knows who they can talk to:
    ```
-   mcp__session-intercom__intercom_list_sessions()
+   intercom_list_sessions()
    ```
 
 4. **Report back** concisely:
    - The session name that was registered
-   - Whether native inbox delivery is active (the register response will include `native_inbox: true` if so)
-   - A short list of other currently-active sessions (or "no other sessions online")
-   - One-line reminder: "Send messages with `intercom_send(\"<name>\", \"<recipient>\", \"...\")` or broadcast with `intercom_broadcast(\"<name>\", \"...\")`."
+   - Whether `inbox_file_ready: true` came back from register (note: this only confirms the file is set up, not that delivery is firing — recommend `intercom_diagnose()` to verify if the user later complains)
+   - A short list of currently-active sessions (or "no other sessions online")
+   - One-line reminder: "Send messages with `intercom_send(to_name=\"<recipient>\", body=\"...\")` — no need to repeat your own name."
 
 Do NOT ask for confirmation before running the steps — the user already invoked `/intercom`, that IS the confirmation. Just do it and report the result.
