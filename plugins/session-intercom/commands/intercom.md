@@ -31,7 +31,11 @@ If no name was provided, pick a sensible one based on the current working direct
 
 4. **Report back** concisely:
    - The session name that was registered
-   - Whether `inbox_file_ready: true` came back from register (note: this only confirms the file is set up, not that delivery is firing — recommend `intercom_diagnose()` to verify if the user later complains)
+   - The `delivery_health` field from the register response:
+     - `likely_ok` → native delivery is set up and inbox is clean. Done.
+     - `likely_broken` → the response includes `unread_in_file_inbox` and concrete recovery steps. Run them now (TeamDelete → TeamCreate → re-register) and report the new health.
+     - `no_inbox` → re-run TeamCreate then re-register (the response's `next_step` field has the exact call).
+     - `polling_only` → fine, but warn the user they'll need `intercom_poll` to receive messages.
    - A short list of currently-active sessions (or "no other sessions online")
    - One-line reminder: "Send messages with `intercom_send(to_name=\"<recipient>\", body=\"...\")` — no need to repeat your own name."
 
