@@ -1,7 +1,7 @@
 {
   "name": "session-intercom",
-  "version": "0.5.0",
-  "description": "P2P messaging between independent Claude Code sessions with zero-polling native inbox delivery. Ships the intercom MCP server, a one-command setup slash command, and a SessionStart hook that auto-registers every session.",
+  "version": "0.6.0",
+  "description": "P2P messaging between independent Claude Code sessions using the Channels API. Inbound DMs and broadcasts arrive between turns as <channel> tags — zero polling, no file inbox. Ships the intercom MCP server, a one-call setup slash command, and a SessionStart hook that auto-registers every session.",
   "author": {
     "name": "Struktured Labs"
   },

@@ -1,12 +1,12 @@
 ---
 name: session-intercom
-description: Use this skill when the user wants to coordinate between multiple Claude Code sessions, send messages between agents, set up P2P agent communication, mentions "intercom", "agent messaging", "session messaging", "talk to another agent/session", "broadcast to agents", or asks how to make two sessions cooperate. This skill explains how to use the session-intercom MCP to enable zero-polling P2P messaging.
-version: 0.4.0
+description: Use this skill when the user wants to coordinate between multiple Claude Code sessions, send messages between agents, set up P2P agent communication, mentions "intercom", "agent messaging", "session messaging", "talk to another agent/session", "broadcast to agents", or asks how to make two sessions cooperate. This skill explains how to use the session-intercom MCP to enable zero-polling P2P messaging over the Channels API.
+version: 0.6.0
 ---
 
 # session-intercom
 
-Enables peer-to-peer messaging between independent Claude Code sessions. Messages are delivered directly to Claude's native inbox with zero polling — they arrive between turns like teammate notifications, not as tool calls that burn context tokens.
+Enables peer-to-peer messaging between independent Claude Code sessions. Inbound DMs and channel broadcasts arrive between turns as `<channel source="session-intercom" from="<sender>" ...>body</channel>` tags via the [Channels API](https://code.claude.com/docs/en/channels-reference) — no polling, no file inbox.
 
 ## When to use
 
@@ -18,7 +18,7 @@ Activate this skill when the user wants to:
 - Discover what other sessions are currently online
 - Set up intercom for a new session from scratch
 
-## One-command setup
+## One-call setup
 
 If the user's session is not yet registered with intercom, run the slash command:
 
@@ -26,7 +26,9 @@ If the user's session is not yet registered with intercom, run the slash command
 /session-intercom:intercom <session-name>
 ```
 
-That one command handles `TeamCreate` + `intercom_register` in a single step. Pick a short, descriptive name (alphanumeric with hyphens, 1–64 chars) — usually the project name or the role this session is playing. If the user didn't specify, suggest one based on the cwd and just run it.
+That one command runs `intercom_register(name=...)`. Pick a short, descriptive name (alphanumeric with hyphens, 1–64 chars) — usually the project name or the role this session is playing. If the user didn't specify, suggest one based on the cwd and just run it.
+
+**Host launch flag**: session-intercom uses the Channels API, currently in research preview. Claude Code must be launched with `--dangerously-load-development-channels server:session-intercom` for `<channel>` tags to arrive. If the user complains messages aren't being received, this is the first thing to check. The flag is per-launch, not per-message.
 
 ## Core tools
 
@@ -39,29 +41,25 @@ After registering, **you don't need to pass your own name on every call** — `i
 | `intercom_list_sessions()` | See who else is online |
 | `intercom_list_channels()` | List available broadcast channels |
 | `intercom_history(with_session=..., channel=..., limit=50)` | Inspect past messages — does NOT consume them |
-| `intercom_diagnose()` | Verify native inbox delivery is actually working |
-| `intercom_poll()` | Explicit drain — only needed if `intercom_diagnose` reports broken delivery |
+| `intercom_poll()` | Explicit drain — rarely needed; inbound arrives as `<channel>` tags automatically |
 | `intercom_create_channel(channel_name)` | Create a new broadcast channel |
-| `intercom_cleanup()` | Remove sessions inactive for 2+ weeks (default; pass smaller TTL to be more aggressive — but you'll delete other agents' sessions) |
+| `intercom_cleanup()` | Remove sessions inactive for 2+ weeks (default; pass a smaller TTL to be more aggressive — but you'll delete other agents' sessions) |
 
 All tools accept an optional override arg (`from_name=` or `name=`) for the rare case you need to act as a different identity.
 
 ## Receiving messages (zero-polling)
 
-**You do not need to call `intercom_poll`.** Once registered with a `team_name`, messages from other sessions are delivered automatically between turns via the CLI's built-in `InboxPoller`. They appear in your next turn as `<teammate-message>` notifications. Treat them like any other user/teammate input.
+You do **not** need to call `intercom_poll`. Once registered, the MCP server runs a background tailer that polls the shared DB and emits `notifications/claude/channel` over its stdio. Claude Code injects each one as a `<channel source="session-intercom" from="<sender>" message_id="<id>">body</channel>` tag on your next turn. Treat them like any other inline input.
 
-**Caveat for long-lived sessions**: the CLI's poller binds at conversation startup. If the team config was created late, or the leadSessionId got out of sync, native delivery can silently fail even though `intercom_register` says it's set up. If the user complains messages aren't arriving, run `intercom_diagnose()` first.
+## Troubleshooting
 
-## Recovering from broken native delivery
+If `<channel>` tags never arrive when other sessions DM you:
 
-If `intercom_diagnose()` returns `delivery_likely_broken`, recovery does **not** require restarting Claude. `TeamDelete` clears the in-process binding, and a subsequent `TeamCreate` in the same session establishes a fresh one. Verified recipe:
+1. **Verify the launch flag**: Claude Code must have been started with `--dangerously-load-development-channels server:session-intercom`. Vanilla `--channels` only loads Anthropic-allowlisted plugins.
+2. **Verify registration**: re-run `intercom_register(name=<name>)`. Registration is idempotent — safe to call repeatedly.
+3. **Manual drain as fallback**: `intercom_poll()` always works regardless of channel state. Use it to confirm the messages exist on the DB side.
 
-1. `TeamDelete()` — clears the stale in-process team context
-2. `TeamCreate(team_name=<name>)` — fresh config with the current session's ID
-3. `intercom_register(name=<name>, team_name=<name>)` — idempotent reclaim, no message history lost
-4. (optional) `/mcp` to reconnect MCP servers if the MCP code itself was updated
-
-`TeamCreate` errors when the team already exists, so step 1 is mandatory. After this, native delivery works in the same conversation — no Claude restart needed.
+There's no team binding to repair, no `TeamCreate` / `TeamDelete` dance, no `delivery_health` field, no `intercom_diagnose` tool. Those existed in the file-inbox era (pre-0.6) and have been removed.
 
 ## Registration is idempotent and durable
 
@@ -74,7 +72,6 @@ If `intercom_diagnose()` returns `delivery_likely_broken`, recovery does **not**
 - Use project + role: `cowir-main`, `cowir-sprite`, `cowir-audio`
 - Or pure role: `frontend`, `backend`, `tester`, `oncall`
 - Lowercase, alphanumeric, hyphens/underscores, 1–64 chars
-- The `team_name` passed to `intercom_register` should match the name
 
 ## Example
 
@@ -82,13 +79,13 @@ If `intercom_diagnose()` returns `delivery_likely_broken`, recovery does **not**
 /session-intercom:intercom backend-api
 ```
 
-→ Registered as `backend-api`, listening for messages via native inbox.
+→ Registered as `backend-api`, listening for channel notifications.
 
 ```
 intercom_send(to_name="frontend-web", body="API v2 deployed, new /users endpoint live")
 ```
 
-→ `frontend-web`'s next turn includes the DM notification automatically.
+→ `frontend-web`'s next turn includes `<channel source="session-intercom" from="backend-api" message_id="42">API v2 deployed, new /users endpoint live</channel>`.
 
 ## When NOT to use
 
