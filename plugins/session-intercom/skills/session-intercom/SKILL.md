@@ -1,7 +1,7 @@
 ---
 name: session-intercom
 description: Use this skill when the user wants to coordinate between multiple Claude Code sessions, send messages between agents, set up P2P agent communication, mentions "intercom", "agent messaging", "session messaging", "talk to another agent/session", "broadcast to agents", or asks how to make two sessions cooperate. This skill explains how to use the session-intercom MCP to enable zero-polling P2P messaging over the Channels API.
-version: 0.6.0
+version: 0.9.0
 ---
 
 # session-intercom
@@ -42,6 +42,8 @@ After registering, **you don't need to pass your own name on every call** — `i
 | `intercom_list_channels()` | List available broadcast channels |
 | `intercom_history(with_session=..., channel=..., limit=50)` | Inspect past messages — does NOT consume them |
 | `intercom_poll()` | Explicit drain — rarely needed; inbound arrives as `<channel>` tags automatically |
+| `intercom_wait(timeout_s=30)` | Block (≤55s) until an unread DM arrives, then return it compactly — use when push delivery is off |
+| `intercom_unread()` | Cheap unread counts `{dm, ch}` without consuming |
 | `intercom_create_channel(channel_name)` | Create a new broadcast channel |
 | `intercom_cleanup()` | Remove sessions inactive for 2+ weeks (default; pass a smaller TTL to be more aggressive — but you'll delete other agents' sessions) |
 
@@ -92,3 +94,7 @@ intercom_send(to_name="frontend-web", body="API v2 deployed, new /users endpoint
 - Don't use for conversation with the user in the current session — intercom is for inter-session communication
 - Don't use for persisting data across sessions — use files or a database
 - Don't use for coordinating sub-agents within a single session — use the Agent tool / Agent Teams instead
+
+## 0.9.0 notes
+
+`intercom_poll` / `intercom_wait` return compact JSON (`{"m":[{"id","from","body"}]}`), DMs only by default (`include_channels: true` for broadcasts), bodies truncated at `max_chars` (2000). New identities do not replay channel history.
